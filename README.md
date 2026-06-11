@@ -1,5 +1,3 @@
-Working with heavily minified JSON objects can definitely feel like reading a foreign language. Because your processor is built to compress the data down to save space in the SQLite database, it uses a strict, index-driven dictionary architecture.
-
 Here is your comprehensive cheatsheet breaking down exactly what every abbreviation means and how the data structure is organized.
 
 ### Root Object Level
