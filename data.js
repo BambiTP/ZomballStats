@@ -76,12 +76,8 @@ function getValidTagsByAuthPlayers(matches, playerMatchSets) {
             if (player.a !== 1) continue;
             if (!shouldCount(playerMatchSets, player.n, match.u)) continue;
             const stats = match.pl[i];
-            if (!stats || !stats.zS) continue;
-            let tags = 0;
-            for (const stint of stats.zS) {
-                tags += stint.vT || 0;
-            }
-            totals[player.n] = (totals[player.n] || 0) + tags;
+            if (!stats || !stats.vT) continue;
+            totals[player.n] = (totals[player.n] || 0) + stats.vT;
         }
     }
     return totals;
@@ -95,10 +91,7 @@ function getValidTagsForPlayer(matches, playerName, playerMatchSets) {
             if (player.n !== playerName || player.a !== 1) continue;
             if (!shouldCount(playerMatchSets, playerName, match.u)) continue;
             const stats = match.pl[i];
-            if (!stats || !stats.zS) continue;
-            for (const stint of stats.zS) {
-                total += stint.vT || 0;
-            }
+            if (stats && stats.vT) total += stats.vT;
             break;
         }
     }
