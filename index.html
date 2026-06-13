@@ -3,178 +3,216 @@
 <head>
     <title>Zomball Stats</title>
     <style>
-        #stats { display: block; }
+        .view { display: none; }
         table { border-collapse: collapse; }
-        td { padding: 2px 12px; vertical-align: top; white-space: nowrap; }
+        td, th { padding: 2px 12px; vertical-align: top; white-space: nowrap; }
+        th { text-align: left; }
         td.divider { border-top: 1px solid #999; }
+        #matches-table td, #matches-table th { border-bottom: 1px solid #ddd; }
+        #nav-bar { margin-bottom: 16px; }
+        #nav-bar button { margin-right: 6px; }
+        #nav-bar button.active { font-weight: bold; text-decoration: underline; }
         #filter-bar { margin-bottom: 12px; }
         #filter-bar button { margin-right: 6px; }
+        .survivor-gold { color: goldenrod; font-weight: bold; }
+        .result-survivors { color: green; }
+        .result-zombies { color: red; }
+        #audit-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        #audit-modal-box { background: #fff; border: 1px solid #999; padding: 20px; display: flex; flex-direction: column; gap: 6px; min-width: 280px; }
+        #audit-modal-box input { padding: 4px 6px; font-size: 0.9rem; }
+        #audit-error { color: red; font-size: 0.85rem; min-height: 1em; }
+        #audit-buttons { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
     </style>
 </head>
 <body>
     <a href="https://github.com/BambiTP/ZomballStats">https://github.com/BambiTP/ZomballStats</a>
-    <div id="filter-bar">
-        <button data-period="today">Today</button>
-        <button data-period="week">This Week</button>
-        <button data-period="month">This Month</button>
-        <button data-period="last50">Last 50</button>
-        <button data-period="all">All</button>
+
+    <div id="nav-bar">
+        <button data-view="stats">Stats</button>
+        <button data-view="matches">Matches</button>
     </div>
-    <div id="stats"></div>
+
+    <div id="stats-view" class="view">
+        <div id="filter-bar">
+            <button data-period="today">Today</button>
+            <button data-period="week">This Week</button>
+            <button data-period="month">This Month</button>
+            <button data-period="last50">Last 50</button>
+            <button data-period="all">All</button>
+        </div>
+        <div id="stats"></div>
+    </div>
+
+    <div id="matches-view" class="view">
+        <div id="matches"></div>
+    </div>
+
     <script src="data.js"></script>
-<script>
-    let allMatches = [];
+    <script src="matches.js"></script>
+    <script src="switcher.js"></script>
+    <script>
+        let allMatches = [];
+        let matchesRendered = false;
 
-    function renderStats(matches, playerMatchSets) {
-        const container = document.getElementById('stats');
-        container.innerHTML = '';
+        function renderStats(matches, playerMatchSets) {
+            const container = document.getElementById('stats');
+            container.innerHTML = '';
 
-        const games = getGamesByAuthPlayers(matches, playerMatchSets);
-        const tags = getValidTagsByAuthPlayers(matches, playerMatchSets);
-        const survival = getSurvivalTimeByAuthPlayers(matches, playerMatchSets);
-        const survivalPerZombie = getSurvivalTimePerZombieByAuthPlayers(matches, playerMatchSets);
-        const gameCountPerZombie = getGameCountPerZombieByAuthPlayers(matches, playerMatchSets);
-        const firstLastNever = getFirstLastNeverByAuthPlayers(matches, playerMatchSets);
-        const initialZombie = getInitialZombieCountByAuthPlayers(matches, playerMatchSets);
+            const games = getGamesByAuthPlayers(matches, playerMatchSets);
+            const tags = getValidTagsByAuthPlayers(matches, playerMatchSets);
+            const survival = getSurvivalTimeByAuthPlayers(matches, playerMatchSets);
+            const survivalPerZombie = getSurvivalTimePerZombieByAuthPlayers(matches, playerMatchSets);
+            const gameCountPerZombie = getGameCountPerZombieByAuthPlayers(matches, playerMatchSets);
+            const firstLastNever = getFirstLastNeverByAuthPlayers(matches, playerMatchSets);
+            const initialZombie = getInitialZombieCountByAuthPlayers(matches, playerMatchSets);
 
-        function sortDesc(obj) {
-            return Object.entries(obj).sort((a, b) => b[1] - a[1]);
-        }
-
-        const byZombieCount = {};
-        const avgByZombieCount = {};
-        for (const [name, zombieCounts] of Object.entries(survivalPerZombie)) {
-            for (const [z, t] of Object.entries(zombieCounts)) {
-                if (!byZombieCount[z]) byZombieCount[z] = {};
-                if (!avgByZombieCount[z]) avgByZombieCount[z] = {};
-                byZombieCount[z][name] = t;
-                const gameCount = (gameCountPerZombie[name] && gameCountPerZombie[name][z]) || 1;
-                avgByZombieCount[z][name] = t / gameCount;
+            function sortDesc(obj) {
+                return Object.entries(obj).sort((a, b) => b[1] - a[1]);
             }
-        }
 
-        const columns = [];
-
-        columns.push({ title: 'Total Games', entries: ['Total: ' + getTotalGames(matches)], avgTitle: null, avgEntries: [] });
-
-        columns.push({
-            title: 'Games Played',
-            entries: sortDesc(games).map(([n, c]) => n + ': ' + c),
-            avgTitle: null,
-            avgEntries: []
-        });
-
-        columns.push({
-            title: 'Valid Tags',
-            entries: sortDesc(tags).map(([n, c]) => n + ': ' + c),
-            avgTitle: 'Avg valid tags per game',
-            avgEntries: Object.entries(tags).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, c]) => n + ': ' + (c / (games[n] || 1)).toFixed(2))
-        });
-
-        columns.push({
-            title: 'Survival Time',
-            entries: sortDesc(survival).map(([n, f]) => n + ': ' + framesToTime(f)),
-            avgTitle: 'Avg survival time per game',
-            avgEntries: Object.entries(survival).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, f]) => n + ': ' + framesToTime(f / (games[n] || 1)))
-        });
-
-        for (const z of Object.keys(byZombieCount).sort((a, b) => a - b)) {
-            columns.push({
-                title: 'Survival vs ' + z + 'z',
-                entries: sortDesc(byZombieCount[z]).map(([n, t]) => n + ': ' + framesToTime(t)),
-                avgTitle: 'Avg survival vs ' + z + 'z',
-                avgEntries: sortDesc(avgByZombieCount[z]).map(([n, t]) => n + ': ' + framesToTime(t))
-            });
-        }
-
-        columns.push({
-            title: 'First To Die',
-            entries: Object.entries(firstLastNever).sort((a, b) => b[1].firstToDie - a[1].firstToDie).map(([n, s]) => n + ': ' + s.firstToDie),
-            avgTitle: 'Avg first to die rate',
-            avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].firstToDie / (games[b[0]] || 1)) - (a[1].firstToDie / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.firstToDie / (games[n] || 1)).toFixed(2))
-        });
-
-        columns.push({
-            title: 'Last Alive',
-            entries: Object.entries(firstLastNever).sort((a, b) => b[1].lastAlive - a[1].lastAlive).map(([n, s]) => n + ': ' + s.lastAlive),
-            avgTitle: 'Avg last alive rate',
-            avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].lastAlive / (games[b[0]] || 1)) - (a[1].lastAlive / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.lastAlive / (games[n] || 1)).toFixed(2))
-        });
-
-        columns.push({
-            title: 'Never Died',
-            entries: Object.entries(firstLastNever).sort((a, b) => b[1].neverDied - a[1].neverDied).map(([n, s]) => n + ': ' + s.neverDied),
-            avgTitle: 'Avg survival rate',
-            avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].neverDied / (games[b[0]] || 1)) - (a[1].neverDied / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.neverDied / (games[n] || 1)).toFixed(2))
-        });
-
-        columns.push({
-            title: 'Initial Zombie',
-            entries: sortDesc(initialZombie).map(([n, c]) => n + ': ' + c),
-            avgTitle: 'Avg times starting zombie',
-            avgEntries: Object.entries(initialZombie).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, c]) => n + ': ' + (c / (games[n] || 1)).toFixed(2))
-        });
-
-        const maxEntries = Math.max(...columns.map(c => c.entries.length));
-        const maxAvgEntries = Math.max(...columns.map(c => c.avgEntries.length));
-        const hasAvg = columns.some(c => c.avgEntries.length > 0);
-
-        const table = document.createElement('table');
-
-        const headerRow = table.insertRow();
-        for (const col of columns) {
-            const cell = headerRow.insertCell();
-            const strong = document.createElement('strong');
-            strong.textContent = col.title;
-            cell.appendChild(strong);
-        }
-
-        for (let i = 0; i < maxEntries; i++) {
-            const row = table.insertRow();
-            for (const col of columns) {
-                const cell = row.insertCell();
-                cell.textContent = col.entries[i] || '';
-            }
-        }
-
-        if (hasAvg) {
-            const avgHeaderRow = table.insertRow();
-            for (const col of columns) {
-                const cell = avgHeaderRow.insertCell();
-                cell.className = 'divider';
-                if (col.avgTitle) {
-                    const strong = document.createElement('strong');
-                    strong.textContent = col.avgTitle;
-                    cell.appendChild(strong);
+            const byZombieCount = {};
+            const avgByZombieCount = {};
+            for (const [name, zombieCounts] of Object.entries(survivalPerZombie)) {
+                for (const [z, t] of Object.entries(zombieCounts)) {
+                    if (!byZombieCount[z]) byZombieCount[z] = {};
+                    if (!avgByZombieCount[z]) avgByZombieCount[z] = {};
+                    byZombieCount[z][name] = t;
+                    const gameCount = (gameCountPerZombie[name] && gameCountPerZombie[name][z]) || 1;
+                    avgByZombieCount[z][name] = t / gameCount;
                 }
             }
 
-            for (let i = 0; i < maxAvgEntries; i++) {
+            const columns = [];
+
+            columns.push({ title: 'Total Games', entries: ['Total: ' + getTotalGames(matches)], avgTitle: null, avgEntries: [] });
+
+            columns.push({
+                title: 'Games Played',
+                entries: sortDesc(games).map(([n, c]) => n + ': ' + c),
+                avgTitle: null,
+                avgEntries: []
+            });
+
+            columns.push({
+                title: 'Valid Tags',
+                entries: sortDesc(tags).map(([n, c]) => n + ': ' + c),
+                avgTitle: 'Avg valid tags per game',
+                avgEntries: Object.entries(tags).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, c]) => n + ': ' + (c / (games[n] || 1)).toFixed(2))
+            });
+
+            columns.push({
+                title: 'Survival Time',
+                entries: sortDesc(survival).map(([n, f]) => n + ': ' + framesToTime(f)),
+                avgTitle: 'Avg survival time per game',
+                avgEntries: Object.entries(survival).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, f]) => n + ': ' + framesToTime(f / (games[n] || 1)))
+            });
+
+            for (const z of Object.keys(byZombieCount).sort((a, b) => a - b)) {
+                columns.push({
+                    title: 'Survival vs ' + z + 'z',
+                    entries: sortDesc(byZombieCount[z]).map(([n, t]) => n + ': ' + framesToTime(t)),
+                    avgTitle: 'Avg survival vs ' + z + 'z',
+                    avgEntries: sortDesc(avgByZombieCount[z]).map(([n, t]) => n + ': ' + framesToTime(t))
+                });
+            }
+
+            columns.push({
+                title: 'First To Die',
+                entries: Object.entries(firstLastNever).sort((a, b) => b[1].firstToDie - a[1].firstToDie).map(([n, s]) => n + ': ' + s.firstToDie),
+                avgTitle: 'Avg first to die rate',
+                avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].firstToDie / (games[b[0]] || 1)) - (a[1].firstToDie / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.firstToDie / (games[n] || 1)).toFixed(2))
+            });
+
+            columns.push({
+                title: 'Last Alive',
+                entries: Object.entries(firstLastNever).sort((a, b) => b[1].lastAlive - a[1].lastAlive).map(([n, s]) => n + ': ' + s.lastAlive),
+                avgTitle: 'Avg last alive rate',
+                avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].lastAlive / (games[b[0]] || 1)) - (a[1].lastAlive / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.lastAlive / (games[n] || 1)).toFixed(2))
+            });
+
+            columns.push({
+                title: 'Never Died',
+                entries: Object.entries(firstLastNever).sort((a, b) => b[1].neverDied - a[1].neverDied).map(([n, s]) => n + ': ' + s.neverDied),
+                avgTitle: 'Avg survival rate',
+                avgEntries: Object.entries(firstLastNever).sort((a, b) => (b[1].neverDied / (games[b[0]] || 1)) - (a[1].neverDied / (games[a[0]] || 1))).map(([n, s]) => n + ': ' + (s.neverDied / (games[n] || 1)).toFixed(2))
+            });
+
+            columns.push({
+                title: 'Initial Zombie',
+                entries: sortDesc(initialZombie).map(([n, c]) => n + ': ' + c),
+                avgTitle: 'Avg times starting zombie',
+                avgEntries: Object.entries(initialZombie).sort((a, b) => (b[1] / (games[b[0]] || 1)) - (a[1] / (games[a[0]] || 1))).map(([n, c]) => n + ': ' + (c / (games[n] || 1)).toFixed(2))
+            });
+
+            const maxEntries = Math.max(...columns.map(c => c.entries.length));
+            const maxAvgEntries = Math.max(...columns.map(c => c.avgEntries.length));
+            const hasAvg = columns.some(c => c.avgEntries.length > 0);
+
+            const table = document.createElement('table');
+
+            const headerRow = table.insertRow();
+            for (const col of columns) {
+                const cell = headerRow.insertCell();
+                const strong = document.createElement('strong');
+                strong.textContent = col.title;
+                cell.appendChild(strong);
+            }
+
+            for (let i = 0; i < maxEntries; i++) {
                 const row = table.insertRow();
                 for (const col of columns) {
                     const cell = row.insertCell();
-                    cell.textContent = col.avgEntries[i] || '';
+                    cell.textContent = col.entries[i] || '';
                 }
             }
+
+            if (hasAvg) {
+                const avgHeaderRow = table.insertRow();
+                for (const col of columns) {
+                    const cell = avgHeaderRow.insertCell();
+                    cell.className = 'divider';
+                    if (col.avgTitle) {
+                        const strong = document.createElement('strong');
+                        strong.textContent = col.avgTitle;
+                        cell.appendChild(strong);
+                    }
+                }
+
+                for (let i = 0; i < maxAvgEntries; i++) {
+                    const row = table.insertRow();
+                    for (const col of columns) {
+                        const cell = row.insertCell();
+                        cell.textContent = col.avgEntries[i] || '';
+                    }
+                }
+            }
+
+            container.appendChild(table);
         }
 
-        container.appendChild(table);
-    }
+        document.getElementById('filter-bar').addEventListener('click', function(e) {
+            if (!e.target.dataset.period) return;
+            const period = e.target.dataset.period;
+            if (period === 'last50') {
+                renderStats(allMatches, getPlayerMatchSets(allMatches, 50));
+            } else {
+                renderStats(filterMatches(allMatches, period));
+            }
+        });
 
-    document.getElementById('filter-bar').addEventListener('click', function(e) {
-        if (!e.target.dataset.period) return;
-        const period = e.target.dataset.period;
-        if (period === 'last50') {
-            renderStats(allMatches, getPlayerMatchSets(allMatches, 50));
-        } else {
-            renderStats(filterMatches(allMatches, period));
-        }
-    });
+        getData().then(matches => {
+            allMatches = matches;
 
-    getData().then(matches => {
-        allMatches = matches;
-        renderStats(allMatches);
-    });
-</script>
+            Switcher.register('matches', () => {
+                if (!matchesRendered) {
+                    renderMatches(allMatches);
+                    matchesRendered = true;
+                }
+            });
+
+            Switcher.init();
+            renderStats(allMatches);
+        });
+    </script>
 </body>
 </html>
