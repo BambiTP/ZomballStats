@@ -1,8 +1,27 @@
-# Zomball Match Data Structure
+# Zomball Stats
 
-## Full API Response (`/stats/all`)
+Query params:
+- `?period=today|week|month` (resets at 10 AM EST)
+- `?players=Name%20One,Name%20Two`
+- `?start=YYYY-MM-DDTHH:MM:SSZ` or Unix timestamp
+- `?end=YYYY-MM-DDTHH:MM:SSZ` or Unix timestamp
+- `?limit=N`
 
-Each match object returned by the API contains the following top-level fields.
+### Get match by tagpro.eu ID
+```
+GET https://stats.zomball.workers.dev/stats/:id
+```
+
+### Get match by UUID
+```
+GET https://stats.zomball.workers.dev/stats/:uuid
+```
+
+---
+
+## Data Structure
+
+### Full API Response (`/stats/all`)
 
 | Key | Type | Description |
 | --- | --- | --- |
@@ -19,7 +38,7 @@ Each match object returned by the API contains the following top-level fields.
 
 ---
 
-## Roster Entry (`r[i]`)
+### Roster Entry (`r[i]`)
 
 All keys except `n` are omitted if not applicable.
 
@@ -28,16 +47,15 @@ All keys except `n` are omitted if not applicable.
 | **`n`** | String | **Name**: The player's display name. |
 | **`a`** | Integer | **Authenticated**: `1` if the player is logged in. Omitted if not. |
 | **`ljz`** | Integer | **Late Join Zombie**: `1` if the player joined as a zombie and was never a survivor. Omitted otherwise. |
-| **`alt`** | Array of Strings | **Alternate Names**: Other names this player used in the match (unauth Some Ball merges). Omitted if none. |
-| **`merged`** | Integer | **Merged Into**: Roster index this entry was merged into. Present only on merged entries — `pl[i]` will be null for these. |
+| **`alt`** | Array of Strings | **Alternate Names**: Other Some Ball names this player used after dying and rejoining within 6 seconds. Omitted if none. |
 
 ---
 
-## Player Stats (`pl[i]`)
+### Player Stats (`pl[i]`)
 
-All keys are omitted if empty or zero. `pl[i]` is null if the roster entry was merged into another player.
+All keys are omitted if empty or zero.
 
-### Survivor Side
+#### Survivor Side
 
 | Key | Type | Description |
 | --- | --- | --- |
@@ -47,7 +65,7 @@ All keys are omitted if empty or zero. `pl[i]` is null if the roster entry was m
 | **`tB`** | Object | **Tagged By**: The tag event that ended this player's survivor run. Omitted if they survived to the end. |
 | **`ste`** | Integer | **Survived To End**: `1` if the player was alive when the match ended. Omitted otherwise. |
 
-### Zombie Side
+#### Zombie Side
 
 | Key | Type | Description |
 | --- | --- | --- |
@@ -58,7 +76,7 @@ All keys are omitted if empty or zero. `pl[i]` is null if the roster entry was m
 
 ---
 
-## Tag Event (used in `tB` and `tP`)
+### Tag Event (used in `tB` and `tP`)
 
 | Key | Type | Description |
 | --- | --- | --- |
@@ -73,5 +91,5 @@ All keys are omitted if empty or zero. `pl[i]` is null if the roster entry was m
 
 - To find survivors who won: filter `pl` for entries with `ste: 1`.
 - To find the last person to become a zombie (when nobody survived): find the player with no `ste` and the highest `tB.t`.
-- Merged roster entries (`merged` key present) are unauth Some Ball players who left and rejoined as a zombie within 6 seconds (360 frames). Their stats are accumulated onto the original entry. Their index in `pl` is null.
-- `iZ` contains the roster indexes of players who started the match as zombies. These are excluded from first/last/never-died calculations.
+- `alt` on a roster entry means that player died, refreshed, and rejoined as a new Some Ball name within 6 seconds. Their stats are accumulated under the original entry.
+- `iZ` contains roster indexes of players who started the match as zombies. These are excluded from first/last/never-died calculations.
