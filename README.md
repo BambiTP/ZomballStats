@@ -1,66 +1,77 @@
-Here is your comprehensive cheatsheet breaking down exactly what every abbreviation means and how the data structure is organized.
+# Zomball Match Data Structure
 
-### Root Object Level
+## Full API Response (`/stats/all`)
 
-This is the top-level structure of the JSON payload saved to your `data` column in the database.
+Each match object returned by the API contains the following top-level fields.
 
-| Key | Data Type | Description |
+| Key | Type | Description |
 | --- | --- | --- |
-| **`u`** | String | **UUID**: The TagPro match UUID (appended during the POST route). |
-| **`mN`** | String | **Map Name**: The name of the map played (appended during the POST route). |
-| **`d`** | Integer | **Date**: The exact timestamp of the match (appended during the POST route). |
-| **`iZ`** | Array of Integers | **Initial Zombies**: The roster indexes of the starting zombies. |
-| **`r`** | Array of Objects | **Roster**: The master list of players. The array position (0, 1, 2...) serves as the player's universal ID throughout the rest of the payload. |
-| **`pl`** | Object | **Players**: The core dictionary holding all match stats, keyed by the roster index. |
-| **`lSP`** | Integer / Null | **Last Survivor Pop**: The precise frame/timestamp the final survivor was popped, triggering the end game boundary. |
+| **`id`** | String | **TagPro.eu ID**: The match ID from tagpro.eu. |
+| **`pAt`** | Integer | **Processed At**: Unix timestamp of when the match was processed and stored. |
+| **`u`** | String | **UUID**: The TagPro match UUID. |
+| **`mN`** | String | **Map Name**: The name of the map played. |
+| **`d`** | Integer | **Date**: Unix timestamp of when the match was played. |
+| **`iZ`** | Array of Integers | **Initial Zombies**: Roster indexes of the starting zombies. |
+| **`r`** | Array of Objects | **Roster**: Master list of players. |
+| **`pl`** | Array of Objects | **Players**: Player stats array. Index matches roster position. |
+| **`lSP`** | Integer / Null | **Last Survivor Pop**: Frame the final survivor was popped. Null if survivors won. |
+| **`matchLength`** | Integer | **Match Length**: Total duration of the match in frames. |
 
 ---
 
-### Roster Matrix (`r`)
+## Roster Entry (`r[i]`)
 
-Inside the `r` array, each object represents a player.
+All keys except `n` are omitted if not applicable.
 
-| Key | Data Type | Description |
+| Key | Type | Description |
 | --- | --- | --- |
 | **`n`** | String | **Name**: The player's display name. |
-| **`a`** | Integer | **Authenticated**: Present only if the player is logged in (`1`). If they are not authenticated, this key is completely omitted to save space. |
+| **`a`** | Integer | **Authenticated**: `1` if the player is logged in. Omitted if not. |
+| **`ljz`** | Integer | **Late Join Zombie**: `1` if the player joined as a zombie and was never a survivor. Omitted otherwise. |
+| **`alt`** | Array of Strings | **Alternate Names**: Other names this player used in the match (unauth Some Ball merges). Omitted if none. |
+| **`merged`** | Integer | **Merged Into**: Roster index this entry was merged into. Present only on merged entries — `pl[i]` will be null for these. |
 
 ---
 
-### Player Stats Object (`pl`)
+## Player Stats (`pl[i]`)
 
-Inside the `pl` object, the keys are integers corresponding to the player's index in the `r` roster array. The values are the stripped payload objects for that specific player. Keys are omitted if they hold no data.
+All keys are omitted if empty or zero. `pl[i]` is null if the roster entry was merged into another player.
 
-| Key | Data Type | Description |
+### Survivor Side
+
+| Key | Type | Description |
 | --- | --- | --- |
-| **`sT`** | Integer | **Survival Total**: Total overall time spent surviving as a human. |
-| **`sZ`** | Object | **Survival per Zombie Matrix**: Tracks how long the player survived against specific numbers of active zombies. Key is the zombie count, value is the time (e.g., `{"1": 4000, "2": 1500}`). |
-| **`sK`** | Integer | **Spawn Kills**: The number of times the player was popped within 300 frames of spawning, or when zero zombies were active. |
-| **`iT`** | Integer | **Invalid Tags**: The total number of invalid tags (e.g., tagging a spawned player or tagging someone when credit goes elsewhere) executed by this player. |
-| **`tB`** | Object | **Tagged By**: Details about the final tag that ended this player's human run. |
-| **`zS`** | Array of Objects | **Zombie Stints**: An array detailing every continuous period the player spent acting as a zombie. |
+| **`sT`** | Integer | **Survival Total**: Total frames spent alive as a survivor. |
+| **`sZ`** | Object | **Survival per Zombie Count**: Time survived against each zombie count. Key is zombie count, value is frames. e.g. `{"1": 4000, "2": 1500}` |
+| **`sK`** | Integer | **Spawn Kills**: Times popped within 300 frames of spawning, or when zero zombies were active. |
+| **`tB`** | Object | **Tagged By**: The tag event that ended this player's survivor run. Omitted if they survived to the end. |
+| **`ste`** | Integer | **Survived To End**: `1` if the player was alive when the match ended. Omitted otherwise. |
+
+### Zombie Side
+
+| Key | Type | Description |
+| --- | --- | --- |
+| **`zT`** | Integer | **Zombie Time**: Total frames spent as a zombie. |
+| **`vT`** | Integer | **Valid Tags**: Total valid credited tags made. |
+| **`tP`** | Array of Objects | **Tagged Players**: Chronological list of tag events this player executed. |
+| **`iT`** | Integer | **Invalid Tags**: Tags that were not credited (spawn kills, credit stolen by another zombie). |
 
 ---
 
-### Tag Events (`tB` and `tP`)
+## Tag Event (used in `tB` and `tP`)
 
-Both the `tB` (Tagged By) object on a victim and the `tP` (Tagged Players) array inside a zombie stint share this exact same structure detailing a single tag event.
-
-| Key | Data Type | Description |
+| Key | Type | Description |
 | --- | --- | --- |
-| **`p`** | Integer | **Player Index**: The roster index of the killer (if inside `tB`) or the victim (if inside `tP`). |
-| **`t`** | Integer | **Time**: The exact frame/timestamp the tag occurred. |
-| **`z`** | Integer | **Zombies**: The number of active zombies on the map at the exact moment of the tag. |
-| **`s`** | Integer | **Survivors**: The number of active survivors remaining *after* this tag happens. |
+| **`p`** | Integer | **Player Index**: Roster index of the killer (in `tB`) or the victim (in `tP`). |
+| **`t`** | Integer | **Time**: Frame the tag occurred. |
+| **`z`** | Integer | **Zombies**: Number of active zombies at the moment of the tag. |
+| **`s`** | Integer | **Survivors**: Number of survivors remaining *after* this tag. |
 
 ---
 
-### Zombie Stints (`zS`)
+## Notes
 
-If a player switches teams or leaves and comes back, they may have multiple zombie stints. Each stint object contains the following:
-
-| Key | Data Type | Description |
-| --- | --- | --- |
-| **`zT`** | Integer | **Zombie Time**: The total duration of this specific stint played as a zombie. |
-| **`vT`** | Integer | **Valid Tags**: The number of valid, credited tags this zombie made during this specific stint. |
-| **`tP`** | Array of Objects | **Tagged Players**: A chronological array of the specific tags (using the Tag Event structure above) executed during this stint. |
+- To find survivors who won: filter `pl` for entries with `ste: 1`.
+- To find the last person to become a zombie (when nobody survived): find the player with no `ste` and the highest `tB.t`.
+- Merged roster entries (`merged` key present) are unauth Some Ball players who left and rejoined as a zombie within 6 seconds (360 frames). Their stats are accumulated onto the original entry. Their index in `pl` is null.
+- `iZ` contains the roster indexes of players who started the match as zombies. These are excluded from first/last/never-died calculations.
