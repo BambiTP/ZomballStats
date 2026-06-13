@@ -1,5 +1,14 @@
 # Zomball Stats
 
+
+## API Reference
+
+
+### Get all stats (Public)
+```
+GET https://stats.zomball.workers.dev/stats/all
+```
+
 Query params:
 - `?period=today|week|month` (resets at 10 AM EST)
 - `?players=Name%20One,Name%20Two`
