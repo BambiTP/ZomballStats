@@ -64,8 +64,16 @@ function openAuditModal(matchId, matchUuid) {
     };
 }
 
-function renderMatches(matches) {
-    const container = document.getElementById('matches');
+function makePlayerLink(name, fromView) {
+    const btn = document.createElement('button');
+    btn.textContent = name;
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;text-decoration:underline;font-size:inherit;';
+    btn.onclick = () => Player.showPlayer(name, fromView || 'matches');
+    return btn;
+}
+
+function renderMatches(matches, targetId = 'matches') {
+    const container = document.getElementById(targetId);
     container.innerHTML = '';
     const sorted = matches.slice().sort((a, b) => b.d - a.d);
     
@@ -86,27 +94,22 @@ function renderMatches(matches) {
         const row = tbody.insertRow();
         const initialZombieSet = new Set(match.iZ);
 
-        const survivors = [];
+        // Collect survivors (by index) and died list
+        const survivorIndexes = [];
         const died = [];
 
-        // Correct logic: Analyze players to find who survived to the end
         for (let i = 0; i < match.r.length; i++) {
             if (initialZombieSet.has(i)) continue;
-            
             const stats = match.pl[i];
             if (!stats) continue;
-
-            // 'ste' is the definitive flag from your backend for a win
             if (stats.ste) {
-                survivors.push(match.r[i].n);
+                survivorIndexes.push(i);
             } else if (stats.tB) {
-                // Register death for non-survivors
-                died.push({ name: match.r[i].n, t: stats.tB.t });
+                died.push({ index: i, name: match.r[i].n, t: stats.tB.t });
             }
         }
 
-        // Logic: Survivors win if at least one person has the 'ste' flag
-        const survivorsWon = survivors.length > 0;
+        const survivorsWon = survivorIndexes.length > 0;
 
         // Date
         const date = new Date(match.d * 1000);
@@ -124,24 +127,54 @@ function renderMatches(matches) {
         // Length
         row.insertCell().textContent = framesToTime(match.matchLength);
 
-        // Result: Now correctly driven by the 'survivors' array
+        // Result
         const resultCell = row.insertCell();
         resultCell.textContent = survivorsWon ? 'Survivors Win' : 'Zombies Win';
         resultCell.className = survivorsWon ? 'result-survivors' : 'result-zombies';
 
-        // Starting Zombies
-        row.insertCell().textContent = match.iZ.map(i => match.r[i]?.n ?? '?').join(', ');
+        // Starting Zombies — auth players are clickable
+        const szCell = row.insertCell();
+        match.iZ.forEach((i, idx) => {
+            const r = match.r[i];
+            if (!r) {
+                szCell.appendChild(document.createTextNode('?'));
+            } else if (r.a === 1) {
+                szCell.appendChild(makePlayerLink(r.n, 'matches'));
+            } else {
+                szCell.appendChild(document.createTextNode(r.n));
+            }
+            if (idx < match.iZ.length - 1) szCell.appendChild(document.createTextNode(', '));
+        });
 
-        // Last Alive
+        // Last Alive — auth players are clickable
         const lastAliveCell = row.insertCell();
         if (survivorsWon) {
-            lastAliveCell.innerHTML = survivors
-                .map(n => `<span class="survivor-gold">${n}</span>`)
-                .join(', ');
+            survivorIndexes.forEach((i, idx) => {
+                const r = match.r[i];
+                const span = document.createElement('span');
+                span.className = 'survivor-gold';
+                if (r && r.a === 1) {
+                    const btn = makePlayerLink(r.n, 'matches');
+                    btn.style.color = 'goldenrod';
+                    btn.style.fontWeight = 'bold';
+                    span.appendChild(btn);
+                } else {
+                    span.textContent = r ? r.n : '?';
+                }
+                lastAliveCell.appendChild(span);
+                if (idx < survivorIndexes.length - 1) {
+                    lastAliveCell.appendChild(document.createTextNode(', '));
+                }
+            });
         } else if (died.length > 0) {
-            // Sort by time of tag to find the last person standing
             died.sort((a, b) => b.t - a.t);
-            lastAliveCell.textContent = died[0].name;
+            const last = died[0];
+            const r = match.r[last.index];
+            if (r && r.a === 1) {
+                lastAliveCell.appendChild(makePlayerLink(r.n, 'matches'));
+            } else {
+                lastAliveCell.textContent = last.name;
+            }
         } else {
             lastAliveCell.textContent = '—';
         }
