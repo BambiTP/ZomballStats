@@ -43,12 +43,15 @@
         <div id="stats"></div>
     </div>
 
-    <div id="matches-view" class="view">
+<div id="matches-view" class="view">
         <div id="matches"></div>
     </div>
 
+    <div id="player-view" class="view"></div>
+
     <script src="data.js"></script>
     <script src="matches.js"></script>
+    <script src="player.js"></script> 
     <script src="switcher.js"></script>
     <script>
         let allMatches = [];
@@ -200,8 +203,11 @@
             }
         });
 
-        getData().then(matches => {
+      getData().then(matches => {
             allMatches = matches;
+
+            // Initialize the Player module with the fetched data
+            Player.init(allMatches);
 
             Switcher.register('matches', () => {
                 if (!matchesRendered) {
