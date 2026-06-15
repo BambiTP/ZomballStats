@@ -221,6 +221,7 @@ function getFirstLastNeverByAuthPlayers(matches, playerMatchSets) {
             if (initialZombies.has(i)) continue;
             const player = match.r[i];
             if (player.a !== 1) continue;
+            if (player.ljz) continue; // skip late join zombies
             const stats = match.pl[i];
             if (!totals[player.n]) totals[player.n] = { firstToDie: 0, lastAlive: 0, neverDied: 0 };
             if (!stats || !stats.tB) {
@@ -255,7 +256,7 @@ function getFirstLastNeverForPlayer(matches, playerName, playerMatchSets) {
         let playerIndex = -1;
         for (let i = 0; i < match.r.length; i++) {
             const player = match.r[i];
-            if (player.n === playerName && player.a === 1 && !initialZombies.has(i)) {
+            if (player.n === playerName && player.a === 1 && !initialZombies.has(i) && !player.ljz) {
                 playerIndex = i;
                 break;
             }
@@ -269,6 +270,7 @@ function getFirstLastNeverForPlayer(matches, playerName, playerMatchSets) {
 
         for (let i = 0; i < match.r.length; i++) {
             if (initialZombies.has(i)) continue;
+            if (match.r[i].ljz) continue; // skip late join zombies
             const stats = match.pl[i];
             if (!stats || !stats.tB) {
                 survivors.push(i);
