@@ -221,12 +221,12 @@ function getFirstLastNeverByAuthPlayers(matches, playerMatchSets) {
             if (initialZombies.has(i)) continue;
             const player = match.r[i];
             if (player.a !== 1) continue;
-            if (player.ljz) continue; // skip late join zombies
+            if (player.ljz) continue;
             const stats = match.pl[i];
             if (!totals[player.n]) totals[player.n] = { firstToDie: 0, lastAlive: 0, neverDied: 0 };
-            if (!stats || !stats.tB) {
+            if (stats && stats.ste) {
                 survivors.push({ name: player.n });
-            } else {
+            } else if (stats && stats.tB) {
                 died.push({ name: player.n, t: stats.tB.t });
             }
         }
@@ -270,19 +270,19 @@ function getFirstLastNeverForPlayer(matches, playerName, playerMatchSets) {
 
         for (let i = 0; i < match.r.length; i++) {
             if (initialZombies.has(i)) continue;
-            if (match.r[i].ljz) continue; // skip late join zombies
+            if (match.r[i].ljz) continue;
             const stats = match.pl[i];
-            if (!stats || !stats.tB) {
+            if (stats && stats.ste) {
                 survivors.push(i);
-            } else {
+            } else if (stats && stats.tB) {
                 died.push({ index: i, t: stats.tB.t });
             }
         }
 
-        if (!playerStats || !playerStats.tB) {
+        if (playerStats && playerStats.ste) {
             totals.neverDied++;
             totals.lastAlive++;
-        } else {
+        } else if (playerStats && playerStats.tB) {
             died.sort((a, b) => a.t - b.t);
             if (died[0].index === playerIndex) totals.firstToDie++;
             if (survivors.length === 0 && died[died.length - 1].index === playerIndex) totals.lastAlive++;
