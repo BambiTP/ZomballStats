@@ -72,11 +72,13 @@ const Player = (() => {
                 }
             }
 
-            if (!initialZombies.has(pIdx)) {
+            const playerIsLjz = match.r[pIdx].ljz;
+            if (!initialZombies.has(pIdx) && !playerIsLjz) {
                 const died = [];
                 let hasSurvivor = false;
                 for (let i = 0; i < match.r.length; i++) {
                     if (initialZombies.has(i)) continue;
+                    if (match.r[i].ljz) continue; // skip late join zombies
                     const s = match.pl[i];
                     if (!s) continue;
                     if (s.ste) hasSurvivor = true;
@@ -129,10 +131,8 @@ const Player = (() => {
             if (aWasSurvivor) {
                 const aSurvEnd = aStats.tB ? aStats.tB.t : match.matchLength;
                 if (bIsIZ) {
-                    // B started as a zombie, A ran from them the whole time
                     aRunTotal += aSurvEnd;
                 } else if (bStats && bStats.tB) {
-                    // B became a zombie mid-match
                     const timeRunning = Math.max(0, aSurvEnd - bStats.tB.t);
                     aRunTotal += timeRunning;
                     aRunNonIZ += timeRunning;
@@ -142,10 +142,8 @@ const Player = (() => {
             if (bWasSurvivor) {
                 const bSurvEnd = bStats.tB ? bStats.tB.t : match.matchLength;
                 if (aIsIZ) {
-                    // A started as a zombie, B ran from them the whole time
                     bRunTotal += bSurvEnd;
                 } else if (aStats && aStats.tB) {
-                    // A became a zombie mid-match
                     const timeRunning = Math.max(0, bSurvEnd - aStats.tB.t);
                     bRunTotal += timeRunning;
                     bRunNonIZ += timeRunning;
@@ -156,8 +154,8 @@ const Player = (() => {
             if (aWasSurvivor && bWasSurvivor) {
                 const aDiedAt = aStats.tB ? aStats.tB.t : Infinity;
                 const bDiedAt = bStats.tB ? bStats.tB.t : Infinity;
-                if (aDiedAt < bDiedAt) bWonScore++;       // A died first, B wins
-                else if (bDiedAt < aDiedAt) aWonScore++;  // B died first, A wins
+                if (aDiedAt < bDiedAt) bWonScore++;
+                else if (bDiedAt < aDiedAt) aWonScore++;
             }
         }
 
