@@ -78,16 +78,16 @@ const Player = (() => {
                 let hasSurvivor = false;
                 for (let i = 0; i < match.r.length; i++) {
                     if (initialZombies.has(i)) continue;
-                    if (match.r[i].ljz) continue; // skip late join zombies
+                    if (match.r[i].ljz) continue;
                     const s = match.pl[i];
                     if (!s) continue;
                     if (s.ste) hasSurvivor = true;
                     else if (s.tB) died.push({ index: i, t: s.tB.t });
                 }
-                if (!stats || stats.ste) {
+                if (stats && stats.ste) {
                     neverDied++;
                     lastAlive++;
-                } else if (stats.tB) {
+                } else if (stats && stats.tB) {
                     died.sort((a, b) => a.t - b.t);
                     if (died.length > 0 && died[0].index === pIdx) firstToDie++;
                     if (!hasSurvivor && died.length > 0 && died[died.length - 1].index === pIdx) lastAlive++;
@@ -159,12 +159,12 @@ const Player = (() => {
             }
         }
 
-        return { 
-            aKilledB, bKilledA, 
-            aRunTotal, aRunNonIZ, 
-            bRunTotal, bRunNonIZ, 
-            aWonScore, bWonScore, 
-            matchCount: matches.length 
+        return {
+            aKilledB, bKilledA,
+            aRunTotal, aRunNonIZ,
+            bRunTotal, bRunNonIZ,
+            aWonScore, bWonScore,
+            matchCount: matches.length
         };
     }
 
@@ -350,7 +350,7 @@ const Player = (() => {
 
     function refreshPlayerContent() {
         const periodMatches = filterMatches(_allMatches, _currentPeriod);
-        
+
         _currentPlayerMatches = getPlayerMatches(periodMatches, _currentPlayerName, _currentMap);
 
         const opponentSet = new Set();
@@ -370,7 +370,7 @@ const Player = (() => {
         if (statsContainer) renderPlayerStats(statsContainer, _currentPlayerName, _currentPlayerMatches, null);
 
         reRenderVs();
-        
+
         renderMatches(_currentPlayerMatches, 'player-matches-container');
     }
 
